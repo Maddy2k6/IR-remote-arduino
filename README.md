@@ -1,293 +1,126 @@
-IR-TXT9000 — Arduino IR Remote Texting Console
+# IR-TXT9000 — Arduino IR Remote Texting Console
 
-A Nokia-style text input system built using an Arduino, IR remote, IR receiver, and a 16×2 I2C LCD.
+A Nokia-style text input system built using an **Arduino**, **IR remote**, **IR receiver**, and a **16×2 I2C LCD**.
 
-The project allows text to be entered using a normal IR remote with classic mobile-phone multi-tap typing. It supports uppercase and lowercase letters, numbers, spaces, cursor movement, backspace, and custom 5×8 LCD emojis. A browser-based interface (ir.html) can also communicate with the Arduino through Web Serial at 9600 baud.
+The project allows text to be entered using a normal IR remote with classic mobile-phone **multi-tap typing**. It supports uppercase and lowercase letters, numbers, spaces, cursor movement, backspace, and custom 5×8 LCD emojis. A browser-based interface (`ir.html`) can also communicate with the Arduino through **Web Serial at 9600 baud**.
 
-Features
+## Features
 
-Nokia-style multi-tap typing using keys 2–9
+- Nokia-style multi-tap typing using keys `2–9`
+- Uppercase and lowercase alphabet modes
+- Number mode
+- Space input
+- Backspace/delete
+- Left and right cursor movement
+- 16 custom 5×8 CGRAM emojis
+- Emoji cycling using the **OK** button
+- 16×2 I2C LCD output
+- IR remote control
+- Serial debugging at **9600 baud**
+- Browser-based LCD/remote simulator
+- Web Serial communication with Arduino
+- Physical remote and browser interface use the same IR command mapping
 
-Uppercase and lowercase alphabet modes
+## Hardware Required
 
-Number mode
+| Component | Quantity |
+|---|---:|
+| Arduino Uno / compatible board | 1 |
+| 16×2 LCD with I2C module | 1 |
+| IR receiver module | 1 |
+| IR remote | 1 |
+| Breadboard | 1 |
+| Jumper wires | As required |
+| USB cable | 1 |
 
-Space input
+## Connections
 
-Backspace/delete
+### 16×2 I2C LCD → Arduino Uno
 
-Left and right cursor movement
-
-16 custom 5×8 CGRAM emojis
-
-Emoji cycling using the OK button
-
-16×2 I2C LCD output
-
-IR remote control
-
-Serial debugging at 9600 baud
-
-Browser-based LCD/remote simulator
-
-Web Serial communication with Arduino
-
-Physical remote and browser interface use the same IR command mapping
-
-Hardware Required
-
-Component
-
-Quantity
-
-Arduino Uno / compatible board
-
-1
-
-16×2 LCD with I2C module
-
-1
-
-IR receiver module
-
-1
-
-IR remote
-
-1
-
-Breadboard
-
-1
-
-Jumper wires
-
-As required
-
-USB cable
-
-1
-
-Connections
-
-16×2 I2C LCD → Arduino Uno
-
-LCD Pin
-
-Arduino Uno
-
-GND
-
-GND
-
-VCC
-
-5V
-
-SDA
-
-A4
-
-SCL
-
-A5
+| LCD Pin | Arduino Uno |
+|---|---|
+| GND | GND |
+| VCC | 5V |
+| SDA | A4 |
+| SCL | A5 |
 
 The project uses the LCD I2C address:
 
+```cpp
 LiquidCrystal_I2C lcd(0x27, 16, 2);
+```
 
-If your display does not respond, scan the I2C bus because some modules use another address such as 0x3F.
+If your display does not respond, scan the I2C bus because some modules use another address such as `0x3F`.
 
-IR Receiver → Arduino
+### IR Receiver → Arduino
 
-IR Receiver Pin
-
-Arduino
-
-OUT / Signal
-
-D2
-
-VCC
-
-5V
-
-GND
-
-GND
+| IR Receiver Pin | Arduino |
+|---|---|
+| OUT / Signal | D2 |
+| VCC | 5V |
+| GND | GND |
 
 The IR input pin is configured as:
 
+```cpp
 #define IR_PIN 2
+```
 
-Check the pin order printed on your particular IR receiver module before connecting it. Receiver pinouts are not identical across every module.
+> Check the pin order printed on your particular IR receiver module before connecting it. Receiver pinouts are not identical across every module.
 
-Remote Control Functions
+## Remote Control Functions
 
-
+![IR Remote Functions](rc.png)
 
 The project uses the following IR commands:
 
-Remote Button
-
-IR Command
-
-Function
-
-0
-
-0x19
-
-0 / Space
-
-1
-
-0x45
-
-1
-
-2
-
-0x46
-
-ABC
-
-3
-
-0x47
-
-DEF
-
-4
-
-0x44
-
-GHI
-
-5
-
-0x40
-
-JKL
-
-6
-
-0x43
-
-MNO
-
-7
-
-0x07
-
-PQRS
-
-8
-
-0x15
-
-TUV
-
-9
-
-0x09
-
-WXYZ
-
-OK
-
-0x1C
-
-Cycle/select emoji
-
-* / MUTE
-
-0x16
-
-Toggle Alphabet ↔ Number mode
-
-UP
-
-0x18
-
-Capital-letter mode
-
-DOWN
-
-0x52
-
-Small-letter mode
-
-LEFT
-
-0x08
-
-Move cursor left
-
-RIGHT
-
-0x5A
-
-Move cursor right
-
-BACK
-
-0x0D
-
-Backspace/delete
+| Remote Button | IR Command | Function |
+|---|---:|---|
+| `0` | `0x19` | 0 / Space |
+| `1` | `0x45` | 1 |
+| `2` | `0x46` | ABC |
+| `3` | `0x47` | DEF |
+| `4` | `0x44` | GHI |
+| `5` | `0x40` | JKL |
+| `6` | `0x43` | MNO |
+| `7` | `0x07` | PQRS |
+| `8` | `0x15` | TUV |
+| `9` | `0x09` | WXYZ |
+| `OK` | `0x1C` | Cycle/select emoji |
+| `* / MUTE` | `0x16` | Toggle Alphabet ↔ Number mode |
+| `UP` | `0x18` | Capital-letter mode |
+| `DOWN` | `0x52` | Small-letter mode |
+| `LEFT` | `0x08` | Move cursor left |
+| `RIGHT` | `0x5A` | Move cursor right |
+| `BACK` | `0x0D` | Backspace/delete |
 
 The supplied remote image should be stored in the repository as exactly:
 
+```text
 rc.png
+```
 
 GitHub will then automatically display it in this README.
 
-Multi-Tap Typing
+## Multi-Tap Typing
 
 The alphabet mode works like an old Nokia keypad.
 
-Key
-
-Characters
-
-2
-
-A B C
-
-3
-
-D E F
-
-4
-
-G H I
-
-5
-
-J K L
-
-6
-
-M N O
-
-7
-
-P Q R S
-
-8
-
-T U V
-
-9
-
-W X Y Z
-
-0
-
-Space
+| Key | Characters |
+|---|---|
+| 2 | A B C |
+| 3 | D E F |
+| 4 | G H I |
+| 5 | J K L |
+| 6 | M N O |
+| 7 | P Q R S |
+| 8 | T U V |
+| 9 | W X Y Z |
+| 0 | Space |
 
 For example:
 
+```text
 2       → A
 2 2     → B
 2 2 2   → C
@@ -296,246 +129,222 @@ For example:
 7 7     → Q
 7 7 7   → R
 7 7 7 7 → S
+```
 
-Repeated presses must occur before the multi-tap timeout. The project uses approximately 900 ms.
+Repeated presses must occur before the multi-tap timeout. The project uses approximately **900 ms**.
 
-Input Modes
+## Input Modes
 
-Capital Letters
+### Capital Letters
 
-Press UP.
+Press **UP**.
 
+```text
 ABC CAPITAL
+```
 
 Example:
 
+```text
 HELLO
+```
 
-Small Letters
+### Small Letters
 
-Press DOWN.
+Press **DOWN**.
 
+```text
 abc small
+```
 
 Example:
 
+```text
 hello
+```
 
-Number Mode
+### Number Mode
 
-Press MUTE to switch between alphabet and number input.
+Press **MUTE** to switch between alphabet and number input.
 
 In number mode, pressing a numeric key directly inserts that number.
 
-Space
+### Space
 
-In alphabet mode, press 0.
+In alphabet mode, press `0`.
 
-Backspace
+### Backspace
 
-Press the BACK button to remove the previous/current character.
+Press the **BACK** button to remove the previous/current character.
 
-Cursor Control
+### Cursor Control
 
 Use:
 
+```text
 LEFT  → move cursor left
 RIGHT → move cursor right
+```
 
-The text buffer represents the full 32 character positions of the 16×2 LCD.
+The text buffer represents the full **32 character positions** of the 16×2 LCD.
 
-Emoji System
+## Emoji System
 
-The HD44780-compatible LCD cannot display normal Unicode emojis directly. Instead, the project creates custom 5×8 pixel characters using CGRAM.
+The HD44780-compatible LCD cannot display normal Unicode emojis directly. Instead, the project creates custom **5×8 pixel characters using CGRAM**.
 
 The browser interface contains 16 custom designs, including:
 
-Happy
+- Happy
+- Sad
+- Heart
+- Angry
+- Surprised
+- Wink
+- Laugh
+- Cool
+- Star
+- Check
+- Music
+- Bell
+- Up arrow
+- Down arrow
+- Battery
+- Alien
 
-Sad
+Press **OK** repeatedly to cycle through the available emoji designs. Stop pressing to confirm the selected emoji.
 
-Heart
+### CGRAM Limitation
 
-Angry
+A standard HD44780 LCD provides only **8 CGRAM custom-character slots at one time**. Therefore, although the project contains a larger emoji library, only a limited number of unique custom glyphs can be loaded simultaneously.
 
-Surprised
+## Arduino Libraries
 
-Wink
+Install the following libraries through **Arduino IDE → Library Manager**:
 
-Laugh
-
-Cool
-
-Star
-
-Check
-
-Music
-
-Bell
-
-Up arrow
-
-Down arrow
-
-Battery
-
-Alien
-
-Press OK repeatedly to cycle through the available emoji designs. Stop pressing to confirm the selected emoji.
-
-CGRAM Limitation
-
-A standard HD44780 LCD provides only 8 CGRAM custom-character slots at one time. Therefore, although the project contains a larger emoji library, only a limited number of unique custom glyphs can be loaded simultaneously.
-
-Arduino Libraries
-
-Install the following libraries through Arduino IDE → Library Manager:
-
+```text
 LiquidCrystal_I2C
 IRremote
+```
 
 The sketch also uses Arduino's built-in:
 
+```cpp
 #include <Wire.h>
+```
 
 Typical includes are:
 
+```cpp
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <IRremote.hpp>
 #include <ctype.h>
 #include <string.h>
+```
 
-Serial Connection
+## Serial Connection
 
 The Arduino communicates at:
 
+```text
 9600 baud
+```
 
 The firmware initializes serial communication with:
 
+```cpp
 Serial.begin(9600);
+```
 
 IR button events can be printed in a format such as:
 
+```text
 Button: 0x46
 Button: 0x46
 Button: 0x47
+```
 
 This format is also understood by the browser interface.
 
-Web Interface
+## Web Interface
 
-ir.html provides a cyberpunk-style browser interface that simulates the 16×2 LCD and remote.
+`ir.html` provides a cyberpunk-style browser interface that simulates the 16×2 LCD and remote.
 
 It includes:
 
-Virtual 16×2 dot-matrix LCD
+- Virtual 16×2 dot-matrix LCD
+- On-screen remote
+- Multi-tap text entry
+- Emoji preview
+- Cursor indicator
+- CGRAM slot indicator
+- Physical keyboard input
+- Web Serial connection
+- Synchronization with Arduino IR commands
 
-On-screen remote
+The interface expects the LCD configuration **0x27 / 16×2** and a serial connection at **9600 baud**.
 
-Multi-tap text entry
+## Running the Web Interface
 
-Emoji preview
+For Web Serial, use a Chromium-based desktop browser such as **Google Chrome** or **Microsoft Edge**.
 
-Cursor indicator
+1. Connect the Arduino to the computer using USB.
+2. Upload the Arduino sketch.
+3. Close the Arduino Serial Monitor if it is holding the serial port.
+4. Open `ir.html` in Chrome or Edge.
+5. Click **Connect Arduino**.
+6. Select the Arduino's serial/COM port from the browser dialog.
+7. The status should change to:
 
-CGRAM slot indicator
-
-Physical keyboard input
-
-Web Serial connection
-
-Synchronization with Arduino IR commands
-
-The interface expects the LCD configuration 0x27 / 16×2 and a serial connection at 9600 baud.
-
-Running the Web Interface
-
-For Web Serial, use a Chromium-based desktop browser such as Google Chrome or Microsoft Edge.
-
-Connect the Arduino to the computer using USB.
-
-Upload the Arduino sketch.
-
-Close the Arduino Serial Monitor if it is holding the serial port.
-
-Open ir.html in Chrome or Edge.
-
-Click Connect Arduino.
-
-Select the Arduino's serial/COM port from the browser dialog.
-
-The status should change to:
-
+```text
 connected · 9600 baud
+```
 
-Which COM Port?
+### Which COM Port?
 
-The COM-port number is not hard-coded into the project.
+The COM-port number is **not hard-coded** into the project.
 
 For example, Windows may identify the Arduino as:
 
+```text
 COM3
 COM5
 COM6
 COM10
+```
 
 The exact number depends on the computer and USB connection.
 
 You can find it in:
 
+```text
 Arduino IDE
 → Tools
 → Port
+```
 
 For the web interface, simply select that same Arduino port when Chrome/Edge asks which serial port to connect to.
 
-Browser Keyboard Controls
+## Browser Keyboard Controls
 
 The web interface also supports keyboard input.
 
-Keyboard Key
+| Keyboard Key | Action |
+|---|---|
+| `Enter` | OK / Emoji |
+| `Backspace` | Delete |
+| `←` | Cursor left |
+| `→` | Cursor right |
+| `Tab` | Mute / mode switch |
+| `A–Z` / `a–z` | Direct letter input |
+| `0–9` | Direct number input |
+| `Space` | Space |
 
-Action
-
-Enter
-
-OK / Emoji
-
-Backspace
-
-Delete
-
-←
-
-Cursor left
-
-→
-
-Cursor right
-
-Tab
-
-Mute / mode switch
-
-A–Z / a–z
-
-Direct letter input
-
-0–9
-
-Direct number input
-
-Space
-
-Space
-
-Project Files
+## Project Files
 
 Recommended GitHub repository structure:
 
+```text
 IR-TXT9000/
 │
 ├── README.md
@@ -545,85 +354,73 @@ IR-TXT9000/
 │
 └── images/
     └── project-photo.jpg       # optional
+```
 
-You can rename IR_Texting.ino if your Arduino sketch already has another name. Update this README accordingly.
+You can rename `IR_Texting.ino` if your Arduino sketch already has another name. Update this README accordingly.
 
-Uploading to Arduino
+## Uploading to Arduino
 
-Install the required libraries.
+1. Install the required libraries.
+2. Connect the Arduino using USB.
+3. Open the `.ino` sketch in Arduino IDE.
+4. Select:
 
-Connect the Arduino using USB.
-
-Open the .ino sketch in Arduino IDE.
-
-Select:
-
+```text
 Tools → Board → Arduino Uno
+```
 
-Select the correct port:
+5. Select the correct port:
 
+```text
 Tools → Port → COMx
+```
 
-Click Upload.
+6. Click **Upload**.
+7. After uploading, the LCD should initialize and the IR receiver will wait for commands.
 
-After uploading, the LCD should initialize and the IR receiver will wait for commands.
+## Troubleshooting
 
-Troubleshooting
-
-LCD is blank
-
-Check:
-
-LCD VCC and GND
-
-SDA → A4
-
-SCL → A5
-
-I2C address
-
-LCD contrast potentiometer
-
-lcd.backlight()
-
-IR remote does nothing
+### LCD is blank
 
 Check:
 
-Receiver signal → D2
+- LCD VCC and GND
+- SDA → A4
+- SCL → A5
+- I2C address
+- LCD contrast potentiometer
+- `lcd.backlight()`
 
-Receiver VCC/GND
-
-Remote battery
-
-Correct IR command codes
-
-Correct receiver pinout
-
-Open Serial Monitor at 9600 baud and press remote buttons. You should see button codes.
-
-Browser cannot connect to Arduino
+### IR remote does nothing
 
 Check:
 
-Use Chrome or Edge on desktop
+- Receiver signal → D2
+- Receiver VCC/GND
+- Remote battery
+- Correct IR command codes
+- Correct receiver pinout
 
-Arduino is connected through USB
+Open Serial Monitor at **9600 baud** and press remote buttons. You should see button codes.
 
-Correct serial port is selected
+### Browser cannot connect to Arduino
 
-Serial Monitor is closed
+Check:
 
-Another application is not using the port
+- Use Chrome or Edge on desktop
+- Arduino is connected through USB
+- Correct serial port is selected
+- Serial Monitor is closed
+- Another application is not using the port
+- Baud rate is 9600
 
-Baud rate is 9600
+### Wrong letters appear
 
-Wrong letters appear
+The remote codes can vary between different IR remotes. If another remote is used, read its command values through Serial Monitor and replace the command definitions in the Arduino code and `REMOTE_CODES` mapping in `ir.html`.
 
-The remote codes can vary between different IR remotes. If another remote is used, read its command values through Serial Monitor and replace the command definitions in the Arduino code and REMOTE_CODES mapping in ir.html.
+## How It Works
 
-How It Works
-
+```text
              IR REMOTE
                  │
                  │ Infrared command
@@ -652,29 +449,27 @@ How It Works
           │   ir.html    │
           │ Web Console  │
           └──────────────┘
+```
 
 The Arduino receives an IR command, identifies the corresponding remote button, processes it according to the current input mode, and updates the LCD.
 
-For letters, repeated presses of the same number cycle through the letters assigned to that key. The UP and DOWN buttons control letter case, while MUTE switches alphabet/number mode. The OK button is used for the custom emoji selector.
+For letters, repeated presses of the same number cycle through the letters assigned to that key. The **UP** and **DOWN** buttons control letter case, while **MUTE** switches alphabet/number mode. The **OK** button is used for the custom emoji selector.
 
-Notes
+## Notes
 
-LCD: 16 columns × 2 rows
+- LCD: **16 columns × 2 rows**
+- I2C address used: **0x27**
+- IR receiver signal pin: **D2**
+- Serial baud rate: **9600**
+- Multi-tap timeout: **900 ms**
+- Custom character size: **5×8 pixels**
+- HD44780 CGRAM capacity: **8 custom characters simultaneously**
+- Web Serial is intended for Chrome/Edge desktop browsers.
 
-I2C address used: 0x27
-
-IR receiver signal pin: D2
-
-Serial baud rate: 9600
-
-Multi-tap timeout: 900 ms
-
-Custom character size: 5×8 pixels
-
-HD44780 CGRAM capacity: 8 custom characters simultaneously
-
-Web Serial is intended for Chrome/Edge desktop browsers.
-
-License
+## License
 
 This project is intended for educational and experimental use. Add a license such as the MIT License if you want others to freely reuse and modify the project.
+
+---
+
+Made as an Arduino-based IR remote texting and custom-character LCD experiment.
