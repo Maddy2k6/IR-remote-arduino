@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IR‑TXT9000 · Cyberpunk I2C LCD Texting Console</title>
+<style>
+  :root{
+    --bezel-dark:#07090e;
+    --bezel-mid:#111622;
+    --bezel-light:#1a2133;
+    --screw:#2d374d;
+    --lcd-bg-top:#020b17;
+    --lcd-bg-bot:#01050a;
+    --dot-off:#071e36;
+    --dot-on:#00f0ff;
+    --dot-glow:rgba(0, 240, 255, 0.6);
+    --amber:#ffaa00;
+    --amber-dim:#7a5200;
+    --cyan:#00f0ff;
+    --magenta:#ff0055;
+    --key-face:#121722;
+    --key-face-hi:#1f283a;
+    --key-text:#e0e8f5;
+    --bg:#040507;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;
+    min-height:100%;
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #0c1426 0%, var(--bg) 70%),
+      var(--bg);
+    color:var(--key-text);
+    font-family:'Courier New', ui-monospace, monospace;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:30px 16px 50px;
+    overflow-x:hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+    z-index: 0;
+    animation: gridMove 25s linear infinite;
+  }
+  @keyframes gridMove {
+    0% { background-position: 0 0; }
+    100% { background-position: 32px 32px; }
+  }
+
+  .main-wrapper {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .brand{
+    text-align:center;
+    margin-bottom:20px;
+    animation: fadeInDown 0.8s ease-out;
+  }
+  .brand .model{
+    font-size:12px;
+    letter-spacing:6px;
+    color:var(--amber);
+    text-transform:uppercase;
+    text-shadow: 0 0 10px rgba(255,170,0,0.5);
+  }
+  .brand h1{
+    margin:6px 0 4px;
+    font-size:26px;
+    letter-spacing:3px;
+    color:#fff;
+    font-weight:700;
+    text-shadow: 0 0 15px rgba(0,240,255,0.6);
+  }
+  .brand .sub{
+    font-size:12px;
+    color:#6c7a9c;
+    letter-spacing:1.5px;
+  }
+
+  /* ===================== DEVICE ===================== */
+  .device{
+    background:linear-gradient(160deg, var(--bezel-light), var(--bezel-mid) 45%, var(--bezel-dark));
+    border-radius:24px;
+    padding:22px;
+    box-shadow:
+      0 0 35px rgba(0, 240, 255, 0.15),
+      0 30px 60px -20px rgba(0,0,0,.9),
+      inset 0 1px 1px rgba(255,255,255,.15),
+      inset 0 -2px 4px rgba(0,0,0,.8);
+    width:min(94vw, 460px);
+    position:relative;
+    border:1px solid rgba(0,240,255,0.2);
+    animation: zoomIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .screw{
+    position:absolute;
+    width:10px;height:10px;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 35%, #8a99b5, var(--screw) 60%, #05070a 100%);
+    box-shadow:inset 0 0 2px #000, 0 0 4px rgba(0,0,0,0.8);
+  }
+  .screw.tl{top:12px;left:12px;} .screw.tr{top:12px;right:12px;}
+  .screw.bl{bottom:12px;left:12px;} .screw.br{bottom:12px;right:12px;}
+
+  .module-label{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:10px;
+    letter-spacing:2px;
+    color:#7a8aab;
+    margin-bottom:10px;
+    padding:0 4px;
+    font-weight: 600;
+  }
+  .module-label .id{ color:var(--cyan); text-shadow: 0 0 8px rgba(0,240,255,0.5); }
+  .status-led{
+    width:8px;height:8px;border-radius:50%;
+    background:#102b18;
+    box-shadow:0 0 0 rgba(0,0,0,0);
+    display:inline-block;
+    margin-right:8px;
+    transition:background .2s, box-shadow .2s;
+  }
+  .status-led.on{
+    background:#00ff66;
+    box-shadow:0 0 10px 2px #00ff66, 0 0 20px #00ff66;
+    animation: pulseGlow 1s infinite alternate;
+  }
+  @keyframes pulseGlow {
+    from { opacity: 0.7; }
+    to { opacity: 1; }
+  }
+
+  .serial-bar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:14px;
+    padding:0 2px;
+  }
+  .serial-btn{
+    font-family:inherit;
+    font-size:11px;
+    font-weight: 600;
+    letter-spacing:.5px;
+    color:var(--key-text);
+    background:linear-gradient(160deg, var(--key-face-hi), var(--key-face));
+    border:1px solid rgba(255,255,255,0.1);
+    border-bottom:2px solid #000;
+    border-radius:8px;
+    padding:7px 12px;
+    cursor:pointer;
+    white-space:nowrap;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+  }
+  .serial-btn:hover{
+    border-color: var(--cyan);
+    box-shadow: 0 0 10px rgba(0,240,255,0.3);
+    transform: translateY(-1px);
+  }
+  .serial-btn:active{ transform:translateY(1px); }
+  .serial-btn.connected{
+    color:#031408;
+    background:linear-gradient(160deg, #00ff66, #00b347);
+    border-color:#00ff66;
+    box-shadow: 0 0 12px rgba(0,255,102,0.4);
+  }
+  .serial-btn.unsupported{ opacity:.45; cursor:not-allowed; }
+  .serial-status{
+    font-size:10px;
+    letter-spacing:1px;
+    color:#6c7a9c;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .serial-status.err{ color:var(--magenta); text-shadow: 0 0 5px rgba(255,0,85,0.5); }
+  .serial-status.ok{ color:#00ff66; text-shadow: 0 0 5px rgba(0,255,102,0.5); }
+
+  /* ===================== LCD SCREEN ===================== */
+  .lcd-frame{
+    background:#020408;
+    border-radius:14px;
+    padding:14px;
+    box-shadow:
+      inset 0 3px 12px rgba(0,0,0,.9),
+      0 0 0 1px rgba(0,240,255,0.15),
+      0 0 20px rgba(0,240,255,0.05);
+    margin-bottom:18px;
+    position: relative;
+  }
+  .lcd-glass{
+    position:relative;
+    border-radius:6px;
+    overflow:hidden;
+    background:linear-gradient(180deg, var(--lcd-bg-top), var(--lcd-bg-bot));
+    box-shadow:inset 0 0 25px rgba(0,240,255,0.15);
+  }
+  .lcd-glass::after{
+    content:"";
+    position:absolute; inset:0;
+    background:linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0%,
+      rgba(0, 240, 255, 0.04) 50%,
+      rgba(255,255,255,0) 100%
+    );
+    background-size: 100% 8px;
+    pointer-events:none;
+    animation: scanline 8s linear infinite;
+  }
+  @keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+  }
+  canvas#lcd{
+    display:block;
+    width:100%;
+    height:auto;
+    image-rendering:pixelated;
+  }
+
+  .lcd-footer{
+    display:flex;
+    justify-space:between;
+    font-size:10px;
+    letter-spacing:1.5px;
+    color:#5a6885;
+    margin-top:10px;
+    padding:0 4px;
+    font-weight: 600;
+  }
+  .lcd-footer span b{ color:var(--amber); font-weight:700; text-shadow:0 0 6px rgba(255,170,0,0.4); }
+
+  /* ===================== REMOTE ===================== */
+  .remote{
+    background:linear-gradient(160deg, #0e121a, #07090e);
+    border-radius:18px;
+    padding:16px 14px 18px;
+    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.08),
+      inset 0 -2px 8px rgba(0,0,0,.8),
+      0 10px 20px rgba(0,0,0,0.5);
+  }
+
+  .row{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    margin-bottom:10px;
+  }
+
+  button.key{
+    -webkit-tap-highlight-color:transparent;
+    font-family:inherit;
+    cursor:pointer;
+    color:var(--key-text);
+    background:linear-gradient(160deg, var(--key-face-hi), var(--key-face));
+    border:1px solid rgba(255,255,255,0.08);
+    border-bottom:3px solid #040508;
+    border-radius:12px;
+    padding:10px 0;
+    font-size:12px;
+    letter-spacing:.5px;
+    transition: transform 0.08s ease, background 0.15s ease, box-shadow 0.15s ease;
+    user-select:none;
+    box-shadow:0 2px 4px rgba(0,0,0,0.4);
+    position: relative;
+    overflow: hidden;
+  }
+  button.key:hover {
+    border-color: rgba(0, 240, 255, 0.4);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(0,240,255,0.2), 0 2px 4px rgba(0,0,0,0.4);
+  }
+  button.key:active, button.key.pressed{
+    transform:translateY(2px) scale(0.98);
+    border-bottom-width:1px;
+    background:linear-gradient(160deg, #141924, #0d111a);
+    box-shadow:0 0 15px rgba(0,240,255,0.4), inset 0 1px 3px rgba(0,0,0,0.8);
+  }
+  button.key .sub{
+    display:block;
+    font-size:8px;
+    color:#5a6885;
+    margin-top:2px;
+    letter-spacing:1px;
+  }
+  button.key:hover .sub{ color: var(--cyan); }
+
+  .numpad{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; width:100%; }
+  .numpad button{ width:100%; }
+  .numkey b{ font-size:15px; }
+  .numkey .letters{ font-size:8px; color:var(--cyan); letter-spacing:1px; display:block; margin-top:2px; text-shadow:0 0 5px rgba(0,240,255,0.4);}
+
+  .dpad-wrap{ display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px;}
+  .dpad-side{ flex:0 0 62px; height:54px; }
+  .ok-key{
+    flex:0 0 84px; height:54px;
+    background:linear-gradient(160deg, #6e4e00, var(--amber-dim));
+    border-color: rgba(255, 170, 0, 0.3);
+    color:var(--amber);
+    font-weight:700; letter-spacing:1px;
+    text-shadow: 0 0 8px rgba(255,170,0,0.6);
+  }
+  .ok-key:hover {
+    border-color: var(--amber);
+    box-shadow: 0 0 15px rgba(255,170,0,0.3);
+  }
+  .dpad-side.left::before{content:"◀";}
+  .dpad-side.right::before{content:"▶";}
+
+  .util-row button{ flex:1; height:46px; }
+  .back-key{ color:var(--magenta); text-shadow:0 0 5px rgba(255,0,85,0.4); }
+  .mute-key{ color:var(--cyan); text-shadow:0 0 5px rgba(0,240,255,0.4); }
+
+  .hint{
+    text-align:center;
+    color:#5a6885;
+    font-size:11.5px;
+    margin-top:20px;
+    max-width:460px;
+    line-height:1.6;
+    letter-spacing:.3px;
+    animation: fadeInUp 0.8s ease-out;
+  }
+  .hint kbd{
+    background:#121620;
+    border:1px solid rgba(0,240,255,0.3);
+    border-bottom-width:2px;
+    border-radius:5px;
+    padding:2px 6px;
+    font-size:10px;
+    color:var(--cyan);
+    box-shadow: 0 0 5px rgba(0,240,255,0.2);
+  }
+
+  @keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes zoomIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+</style>
+</head>
+<body>
+
+<div class="main-wrapper">
+  <div class="brand">
+    <div class="model">IR&#8209;TXT&nbsp;9000</div>
+    <h1>Nokia‑Style IR Texting Console</h1>
+    <div class="sub">16×2 I2C LCD · Multi‑Tap Keypad · 1:1 Arduino CGRAM Sync</div>
+  </div>
+
+  <div class="device">
+    <div class="screw tl"></div><div class="screw tr"></div>
+    <div class="screw bl"></div><div class="screw br"></div>
+
+    <div class="module-label">
+      <span><span class="status-led" id="statusLed"></span>LCD 0x27 · 16×2</span>
+      <span class="id" id="modeTag">ABC · CAP</span>
+    </div>
+
+    <div class="serial-bar">
+      <button id="serialBtn" class="serial-btn">🔌 Connect Arduino</button>
+      <span id="serialStatus" class="serial-status">not connected · 9600 baud</span>
+    </div>
+
+    <div class="lcd-frame">
+      <div class="lcd-glass">
+        <canvas id="lcd"></canvas>
+      </div>
+      <div class="lcd-footer">
+        <span>CURSOR <b id="curTag">00</b></span>
+        <span>SLOTS <b id="slotTag">0/8</b></span>
+        <span>EMOJI <b id="emojiTag">-</b></span>
+      </div>
+    </div>
+
+    <div class="remote">
+      <div class="row util-row">
+        <button class="key mute-key" data-cmd="mute">MUTE<span class="sub">ABC / 123</span></button>
+        <button class="key up-key" data-cmd="up">UP<span class="sub">CAPITAL</span></button>
+        <button class="key down-key" data-cmd="down">DOWN<span class="sub">SMALL</span></button>
+      </div>
+
+      <div class="dpad-wrap">
+        <button class="key dpad-side left" data-cmd="left"></button>
+        <button class="key ok-key" data-cmd="ok">OK<span class="sub" style="color:var(--amber);">EMOJI</span></button>
+        <button class="key dpad-side right" data-cmd="right"></button>
+      </div>
+
+      <div class="numpad">
+        <button class="key numkey" data-cmd="1"><b>1</b><span class="letters">1</span></button>
+        <button class="key numkey" data-cmd="2"><b>2</b><span class="letters">ABC</span></button>
+        <button class="key numkey" data-cmd="3"><b>3</b><span class="letters">DEF</span></button>
+        <button class="key numkey" data-cmd="4"><b>4</b><span class="letters">GHI</span></button>
+        <button class="key numkey" data-cmd="5"><b>5</b><span class="letters">JKL</span></button>
+        <button class="key numkey" data-cmd="6"><b>6</b><span class="letters">MNO</span></button>
+        <button class="key numkey" data-cmd="7"><b>7</b><span class="letters">PQRS</span></button>
+        <button class="key numkey" data-cmd="8"><b>8</b><span class="letters">TUV</span></button>
+        <button class="key numkey" data-cmd="9"><b>9</b><span class="letters">WXYZ</span></button>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button class="key numkey back-key" data-cmd="back" style="flex:1;">⌫ BACK</button>
+        <button class="key numkey" data-cmd="0" style="flex:1;"><b>0</b><span class="letters">SPACE</span></button>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint">
+    Press <kbd>OK</kbd> to cycle through all 16 custom CGRAM emojis.<br>
+    Press <kbd>MUTE</kbd> to switch between Alphabet &amp; Number modes.
+  </p>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     5x8 DOT‑MATRIX FONT
+     ============================================================ */
+  const F = {
+    " ":["00000","00000","00000","00000","00000","00000","00000","00000"],
+    "0":["01110","10001","10011","10101","11001","10001","01110","00000"],
+    "1":["00100","01100","00100","00100","00100","00100","01110","00000"],
+    "2":["01110","10001","00001","00010","00100","01000","11111","00000"],
+    "3":["11111","00010","00100","00010","00001","10001","01110","00000"],
+    "4":["00010","00110","01010","10010","11111","00010","00010","00000"],
+    "5":["11111","10000","11110","00001","00001","10001","01110","00000"],
+    "6":["00110","01000","10000","11110","10001","10001","01110","00000"],
+    "7":["11111","00001","00010","00100","01000","01000","01000","00000"],
+    "8":["01110","10001","10001","01110","10001","10001","01110","00000"],
+    "9":["01110","10001","10001","01111","00001","00010","01100","00000"],
+    "A":["01110","10001","10001","11111","10001","10001","10001","00000"],
+    "B":["11110","10001","10001","11110","10001","10001","11110","00000"],
+    "C":["01111","10000","10000","10000","10000","10000","01111","00000"],
+    "D":["11110","10001","10001","10001","10001","10001","11110","00000"],
+    "E":["11111","10000","10000","11110","10000","10000","11111","00000"],
+    "F":["11111","10000","10000","11110","10000","10000","10000","00000"],
+    "G":["01111","10000","10000","10011","10001","10001","01111","00000"],
+    "H":["10001","10001","10001","11111","10001","10001","10001","00000"],
+    "I":["01110","00100","00100","00100","00100","00100","01110","00000"],
+    "J":["00001","00001","00001","00001","00001","10001","01110","00000"],
+    "K":["10001","10010","10100","11000","10100","10010","10001","00000"],
+    "L":["10000","10000","10000","10000","10000","10000","11111","00000"],
+    "M":["10001","11011","10101","10101","10001","10001","10001","00000"],
+    "N":["10001","11001","10101","10101","10011","10001","10001","00000"],
+    "O":["01110","10001","10001","10001","10001","10001","01110","00000"],
+    "P":["11110","10001","10001","11110","10000","10000","10000","00000"],
+    "Q":["01110","10001","10001","10001","10101","10010","01101","00000"],
+    "R":["11110","10001","10001","11110","10100","10010","10001","00000"],
+    "S":["01111","10000","10000","01110","00001","00001","11110","00000"],
+    "T":["11111","00100","00100","00100","00100","00100","00100","00000"],
+    "U":["10001","10001","10001","10001","10001","10001","01110","00000"],
+    "V":["10001","10001","10001","10001","10001","01010","00100","00000"],
+    "W":["10001","10001","10001","10101","10101","10101","01010","00000"],
+    "X":["10001","10001","01010","00100","01010","10001","10001","00000"],
+    "Y":["10001","10001","01010","00100","00100","00100","00100","00000"],
+    "Z":["11111","00001","00010","00100","01000","10000","11111","00000"],
+    "a":["00000","00000","01110","00001","01111","10001","01111","00000"],
+    "b":["10000","10000","11110","10001","10001","10001","11110","00000"],
+    "c":["00000","00000","01111","10000","10000","10000","01111","00000"],
+    "d":["00001","00001","01111","10001","10001","10001","01111","00000"],
+    "e":["00000","00000","01110","10001","11111","10000","01111","00000"],
+    "f":["00110","01001","01000","11110","01000","01000","01000","00000"],
+    "g":["00000","01110","10001","10001","01111","00001","00001","01110"],
+    "h":["10000","10000","11110","10001","10001","10001","10001","00000"],
+    "i":["00100","00000","01100","00100","00100","00100","01110","00000"],
+    "j":["00010","00000","00110","00010","00010","00010","10010","01100"],
+    "k":["10000","10000","10010","10100","11000","10100","10010","00000"],
+    "l":["01100","00100","00100","00100","00100","00100","01110","00000"],
+    "m":["00000","00000","11010","10101","10101","10101","10101","00000"],
+    "n":["00000","00000","10110","11001","10001","10001","10001","00000"],
+    "o":["00000","00000","01110","10001","10001","10001","01110","00000"],
+    "p":["00000","00000","11110","10001","10001","10001","11110","10000"],
+    "q":["00000","00000","01111","10001","10001","10001","01111","00001"],
+    "r":["00000","00000","10110","11001","10000","10000","10000","00000"],
+    "s":["00000","00000","01111","10000","01110","00001","11110","00000"],
+    "t":["01000","01000","11110","01000","01000","01001","00110","00000"],
+    "u":["00000","00000","10001","10001","10001","10011","01101","00000"],
+    "v":["00000","00000","10001","10001","10001","01010","00100","00000"],
+    "w":["00000","00000","10001","10001","10101","10101","01010","00000"],
+    "x":["00000","00000","10001","01010","00100","01010","10001","00000"],
+    "y":["00000","00000","10001","10001","01111","00001","01110","00000"],
+    "z":["00000","00000","11111","00010","00100","01000","11111","00000"],
+    ":":["00000","00100","00100","00000","00100","00100","00000","00000"]
+  };
+
+  /* ============================================================
+     1:1 ARDUINO CGRAM EMOJI LIBRARY (16 EMOJIS TOTAL)
+     ============================================================ */
+  const EMOJI_COUNT = 16;
+  const EMOJIS = [
+    ["00000","01010","01010","00000","10001","01110","00000","00000"], // 0 - HAPPY
+    ["00000","01010","01010","00000","01110","10001","00000","00000"], // 1 - SAD
+    ["00000","01010","11111","11111","11111","01110","00100","00000"], // 2 - HEART
+    ["10001","01010","00000","01010","00000","10001","01110","00000"], // 3 - ANGRY
+    ["00000","01010","01010","00000","00100","01010","00100","00000"], // 4 - SURPRISED
+    ["00000","01000","00010","00000","10001","01110","00000","00000"], // 5 - WINK
+    ["00000","01010","01010","00000","11111","10101","01110","00000"], // 6 - LAUGH
+    ["00000","11111","10101","00000","10001","01110","00000","00000"], // 7 - COOL
+    ["00100","10101","01110","11111","01110","10101","00100","00000"], // 8 - STAR
+    ["00000","00001","00010","10100","01000","00000","00000","00000"], // 9 - CHECK
+    ["00010","00011","00010","00010","01110","11110","01100","00000"], // 10 - MUSIC
+    ["00100","01110","01110","01110","11111","00100","00000","00000"], // 11 - BELL
+    ["00100","01110","10101","00100","00100","00100","00000","00000"], // 12 - UP ARROW
+    ["00100","00100","00100","10101","01110","00100","00000","00000"], // 13 - DOWN ARROW
+    ["01110","11011","10001","10101","10101","10001","11111","00000"], // 14 - BATTERY
+    ["01110","11111","10101","11111","01110","01010","10001","00000"]  // 15 - ALIEN
+  ];
+
+  const KEYPAD = [" ","1","ABC","DEF","GHI","JKL","MNO","PQRS","TUV","WXYZ"];
+  const MULTITAP_TIMEOUT = 900;
+  const EMOJI_TIMEOUT    = 900;
+  const MODE_OVERLAY_MS   = 600;
+
+  /* ============================================================
+     STATE VARIABLES
+     ============================================================ */
+  let textBuffer = new Array(32).fill(null).map(()=>({t:"ch", v:" "}));
+  let cursorPos = 0;
+  let lastKey = -1, tapIndex = 0, lastPressTime = 0;
+
+  let alphabetMode = true;
+  let capitalMode = true;
+
+  let emojiSelecting = false, emojiIndex = 0, emojiLastPress = 0;
+  let previewCell = null;
+  let activeCgramEmojis = [-1,-1,-1,-1,-1,-1,-1,-1];
+  let cgramCount = 0;
+  let modeOverlay = null;
+  let busy = false;
+  let blinkOn = true;
+
+  function getOrAllocCgramSlot(emojiIdx){
+    for(let i=0; i<cgramCount; i++){ 
+      if(activeCgramEmojis[i] === emojiIdx) return i; 
+    }
+    if(cgramCount < 8){
+      const slot = cgramCount;
+      activeCgramEmojis[slot] = emojiIdx;
+      cgramCount++;
+      return slot;
+    }
+    return 0; // Fallback allocation match with Arduino
+  }
+
+  function confirmCharacter(){
+    if(lastKey !== -1){
+      if(cursorPos < 31) cursorPos++;
+      lastKey = -1; tapIndex = 0;
+    }
+  }
+
+  function confirmEmoji(){
+    if(emojiSelecting){
+      const slot = getOrAllocCgramSlot(emojiIndex);
+      textBuffer[cursorPos] = {t:"em", v:slot};
+      emojiSelecting = false;
+      previewCell = null;
+      if(cursorPos < 31) cursorPos++;
+    }
+  }
+
+  function handleEmojiButton(){
+    confirmCharacter();
+    if(!emojiSelecting){
+      emojiSelecting = true;
+      emojiIndex = 0;
+    } else {
+      emojiIndex++;
+      if(emojiIndex >= EMOJI_COUNT) emojiIndex = 0;
+    }
+    const tempSlot = getOrAllocCgramSlot(emojiIndex);
+    previewCell = {slot: tempSlot};
+    emojiLastPress = Date.now();
+  }
+
+  function showModeOverlay(){
+    let l2 = !alphabetMode ? "123 NUMBERS" : (capitalMode ? "ABC CAPITAL" : "abc small");
+    modeOverlay = { l1:"MODE:", l2, until: Date.now() + MODE_OVERLAY_MS };
+    busy = true;
+    setTimeout(()=>{ modeOverlay = null; busy = false; render(); }, MODE_OVERLAY_MS);
+  }
+
+  function pressNumber(n){
+    if(busy) return;
+    confirmEmoji();
+
+    if(!alphabetMode){
+      confirmCharacter();
+      textBuffer[cursorPos] = {t:"ch", v:String(n)};
+      if(cursorPos < 31) cursorPos++;
+      return;
+    }
+
+    if(n === 0){
+      confirmCharacter();
+      textBuffer[cursorPos] = {t:"ch", v:" "};
+      if(cursorPos < 31) cursorPos++;
+      return;
+    }
+    if(n === 1){
+      confirmCharacter();
+      textBuffer[cursorPos] = {t:"ch", v:"1"};
+      if(cursorPos < 31) cursorPos++;
+      return;
+    }
+
+    const now = Date.now();
+    if(n === lastKey && (now - lastPressTime < MULTITAP_TIMEOUT)){
+      tapIndex++;
+      const len = KEYPAD[n].length;
+      if(tapIndex >= len) tapIndex = 0;
+    } else {
+      confirmCharacter();
+      lastKey = n; tapIndex = 0;
+    }
+    let letter = KEYPAD[n][tapIndex];
+    if(!capitalMode) letter = letter.toLowerCase();
+    textBuffer[cursorPos] = {t:"ch", v:letter};
+    lastPressTime = now;
+  }
+
+  function pressCmd(cmd){
+    if(busy) return;
+    switch(cmd){
+      case "ok":
+        handleEmojiButton();
+        break;
+      case "mute":
+        confirmEmoji(); confirmCharacter();
+        alphabetMode = !alphabetMode;
+        showModeOverlay();
+        break;
+      case "up":
+        confirmEmoji(); confirmCharacter();
+        alphabetMode = true; capitalMode = true;
+        showModeOverlay();
+        break;
+      case "down":
+        confirmEmoji(); confirmCharacter();
+        alphabetMode = true; capitalMode = false;
+        showModeOverlay();
+        break;
+      case "back":
+        if(emojiSelecting){
+          emojiSelecting = false;
+          previewCell = null;
+        } else if(lastKey !== -1){
+          lastKey = -1; tapIndex = 0;
+          textBuffer[cursorPos] = {t:"ch", v:" "};
+        } else if(cursorPos > 0){
+          cursorPos--;
+          textBuffer[cursorPos] = {t:"ch", v:" "};
+        }
+        break;
+      case "left":
+        confirmEmoji(); confirmCharacter();
+        if(cursorPos > 0) cursorPos--;
+        break;
+      case "right":
+        confirmEmoji(); confirmCharacter();
+        if(cursorPos < 31) cursorPos++;
+        break;
+    }
+  }
+
+  /* ============================================================
+     TIMERS
+     ============================================================ */
+  setInterval(()=>{
+    const now = Date.now();
+    if(lastKey !== -1 && (now - lastPressTime > MULTITAP_TIMEOUT)){
+      confirmCharacter();
+    }
+    if(emojiSelecting && (now - emojiLastPress > EMOJI_TIMEOUT)){
+      confirmEmoji();
+    }
+    render();
+  }, 80);
+
+  setInterval(()=>{ blinkOn = !blinkOn; render(); }, 500);
+
+  /* ============================================================
+     CANVAS LCD RENDERING
+     ============================================================ */
+  const canvas = document.getElementById("lcd");
+  const ctx = canvas.getContext("2d");
+
+  const DOT = 6, GAP = 1, CHAR_W = 5*DOT + 4*GAP, CHAR_H = 8*DOT + 7*GAP;
+  const CELL_GAP_X = 5, CELL_GAP_Y = 12, PAD = 10;
+  const COLS = 16, ROWS = 2;
+
+  const cw = PAD*2 + COLS*CHAR_W + (COLS-1)*CELL_GAP_X;
+  const ch = PAD*2 + ROWS*CHAR_H + (ROWS-1)*CELL_GAP_Y;
+  const SCALE = window.devicePixelRatio || 1;
+  canvas.width = cw*SCALE; canvas.height = ch*SCALE;
+  canvas.style.aspectRatio = (cw/ch).toFixed(4);
+  ctx.scale(SCALE, SCALE);
+
+  function drawGlyph(rows, ox, oy, dim){
+    for(let r=0;r<8;r++){
+      const bits = rows ? rows[r] : "00000";
+      for(let c=0;c<5;c++){
+        const on = bits && bits[c] === "1";
+        const x = ox + c*(DOT+GAP);
+        const y = oy + r*(DOT+GAP);
+        if(dim){
+          ctx.fillStyle = on ? "rgba(0, 240, 255, 0.35)" : "rgba(7, 30, 54, 0.4)";
+        } else {
+          ctx.fillStyle = on ? "#00f0ff" : "rgba(7, 30, 54, 0.5)";
+        }
+        if(on && !dim){
+          ctx.shadowColor = "#00f0ff";
+          ctx.shadowBlur = 4;
+        } else {
+          ctx.shadowBlur = 0;
+        }
+        ctx.fillRect(x, y, DOT, DOT);
+      }
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  function glyphFor(cell){
+    if(!cell) return F[" "];
+    if(cell.t === "em"){
+      const idx = activeCgramEmojis[cell.v];
+      return idx >= 0 ? EMOJIS[idx] : F[" "];
+    }
+    return F[cell.v] || F[" "];
+  }
+
+  function render(){
+    ctx.clearRect(0,0,cw,ch);
+
+    if(modeOverlay){
+      const rows1 = modeOverlay.l1.padEnd(16," ").split("");
+      const rows2 = modeOverlay.l2.padEnd(16," ").split("");
+      for(let c=0;c<16;c++){
+        drawGlyph(F[rows1[c]] || F[" "], PAD + c*(CHAR_W+CELL_GAP_X), PAD, false);
+        drawGlyph(F[rows2[c]] || F[" "], PAD + c*(CHAR_W+CELL_GAP_X), PAD+CHAR_H+CELL_GAP_Y, false);
+      }
+      updateHud();
+      return;
+    }
+
+    for(let i=0;i<32;i++){
+      const row = i < 16 ? 0 : 1;
+      const col = i < 16 ? i : i-16;
+      const ox = PAD + col*(CHAR_W+CELL_GAP_X);
+      const oy = PAD + row*(CHAR_H+CELL_GAP_Y);
+
+      let cell = textBuffer[i];
+      if(emojiSelecting && previewCell && i === cursorPos){
+        cell = {t:"em", v:previewCell.slot};
+      }
+      drawGlyph(glyphFor(cell), ox, oy, false);
+
+      if(i === cursorPos){
+        ctx.fillStyle = "rgba(0, 240, 255, 0.6)";
+        ctx.fillRect(ox, oy+CHAR_H-DOT-1, 5*DOT+4*GAP, 2);
+        if(blinkOn){
+          ctx.save();
+          ctx.fillStyle = "rgba(0, 240, 255, 0.3)";
+          ctx.shadowColor = "#00f0ff";
+          ctx.shadowBlur = 8;
+          ctx.fillRect(ox-1, oy-1, CHAR_W+2, CHAR_H+2);
+          ctx.restore();
+        }
+      }
+    }
+
+    updateHud();
+  }
+
+  function updateHud(){
+    let tag = !alphabetMode ? "123 · NUM" : (capitalMode ? "ABC · CAP" : "abc · low");
+    document.getElementById("modeTag").textContent = tag;
+    document.getElementById("curTag").textContent = String(cursorPos).padStart(2,"0");
+    document.getElementById("slotTag").textContent = cgramCount + "/8";
+    document.getElementById("emojiTag").textContent = emojiSelecting ? "#" + (emojiIndex + 1) : "-";
+    const led = document.getElementById("statusLed");
+    led.classList.toggle("on", lastKey !== -1 || emojiSelecting);
+  }
+
+  /* ============================================================
+     INPUT WIRING
+     ============================================================ */
+  document.querySelectorAll("button.key[data-cmd]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const cmd = btn.getAttribute("data-cmd");
+      flash(btn);
+      if(/^[0-9]$/.test(cmd)){
+        pressNumber(parseInt(cmd,10));
+        sendToArduino(CODE_FOR_NUM[parseInt(cmd,10)]);
+      } else {
+        pressCmd(cmd);
+        sendToArduino(CODE_FOR_CMD[cmd]);
+      }
+      render();
+    });
+  });
+
+  function flash(btn){
+    btn.classList.add("pressed");
+    setTimeout(()=>btn.classList.remove("pressed"), 110);
+  }
+
+  const keyMap = {
+    "Enter":"ok", "Backspace":"back",
+    "ArrowLeft":"left", "ArrowRight":"right",
+    "Tab":"mute"
+  };
+  window.addEventListener("keydown", (e)=>{
+    if(busy) return;
+
+    const cmd = keyMap[e.key];
+    if(cmd){
+      e.preventDefault();
+      const sel = document.querySelector('button.key[data-cmd="'+cmd+'"]');
+      if(sel) flash(sel);
+      pressCmd(cmd);
+      sendToArduino(CODE_FOR_CMD[cmd]);
+      render();
+      return;
+    }
+
+    if(e.key.length === 1 && /^[a-zA-Z0-9 ]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey){
+      e.preventDefault();
+      typeChar(e.key);
+    }
+  });
+
+  /* ============================================================
+     DIRECT KEYBOARD INPUT SYNC
+     ============================================================ */
+  let arduinoQueue = Promise.resolve();
+
+  function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+
+  function typeChar(ch){
+    const isDigit = /[0-9]/.test(ch);
+    const isSpace = ch === " ";
+    const isLetter = /[a-zA-Z]/.test(ch);
+    if(!isDigit && !isSpace && !isLetter) return;
+
+    confirmEmoji();
+    confirmCharacter();
+    textBuffer[cursorPos] = {t:"ch", v: ch};
+    if(cursorPos < 31) cursorPos++;
+
+    if(isLetter){
+      alphabetMode = true;
+      capitalMode = (ch === ch.toUpperCase());
+    } else if(isDigit && ch !== "1"){
+      alphabetMode = false;
+    } else if(isSpace){
+      alphabetMode = true;
+    }
+
+    render();
+    if(serialPort) {
+      arduinoQueue = arduinoQueue
+        .then(()=>syncCharToArduino(ch))
+        .catch(()=>{});
+    }
+  }
+
+  async function syncCharToArduino(ch){
+    const isDigit = /[0-9]/.test(ch);
+    const isLetter = /[a-zA-Z]/.test(ch);
+
+    if(ch === "1"){
+      await sendToArduino(CODE_FOR_NUM[1]);
+      return;
+    }
+
+    if(isDigit){
+      if(alphabetMode){
+        await sendToArduino(CODE_FOR_CMD.mute);
+        await sleep(650);
+      }
+      await sendToArduino(CODE_FOR_NUM[parseInt(ch,10)]);
+      return;
+    }
+
+    if(ch === " "){
+      if(!alphabetMode){
+        await sendToArduino(CODE_FOR_CMD.mute);
+        await sleep(650);
+      }
+      await sendToArduino(CODE_FOR_NUM[0]);
+      return;
+    }
+
+    if(isLetter){
+      if(!alphabetMode){
+        await sendToArduino(CODE_FOR_CMD.mute);
+        await sleep(650);
+      }
+      const wantCaps = ch === ch.toUpperCase();
+      if(wantCaps !== capitalMode){
+        await sendToArduino(CODE_FOR_CMD[wantCaps ? "up" : "down"]);
+        await sleep(650);
+      }
+      const upper = ch.toUpperCase();
+      let target = null;
+      for(let n=2;n<=9;n++){
+        const idx = KEYPAD[n].indexOf(upper);
+        if(idx !== -1){ target = {n, taps: idx+1}; break; }
+      }
+      if(!target) return;
+      for(let t=0;t<target.taps;t++){
+        await sendToArduino(CODE_FOR_NUM[target.n]);
+        await sleep(140);
+      }
+    }
+  }
+
+  /* ============================================================
+     WEB SERIAL INTERFACE
+     ============================================================ */
+  const REMOTE_CODES = {
+    0x19:{k:"num", v:0}, 0x45:{k:"num", v:1}, 0x46:{k:"num", v:2}, 0x47:{k:"num", v:3},
+    0x44:{k:"num", v:4}, 0x40:{k:"num", v:5}, 0x43:{k:"num", v:6}, 0x07:{k:"num", v:7},
+    0x15:{k:"num", v:8}, 0x09:{k:"num", v:9},
+    0x1C:{k:"cmd", v:"ok"},   0x0D:{k:"cmd", v:"back"},
+    0x08:{k:"cmd", v:"left"}, 0x5A:{k:"cmd", v:"right"},
+    0x16:{k:"cmd", v:"mute"}, 0x18:{k:"cmd", v:"up"}, 0x52:{k:"cmd", v:"down"}
+  };
+
+  let serialPort = null, serialReader = null, serialKeepReading = false;
+  let serialWriter = null;
+  const serialBtn = document.getElementById("serialBtn");
+  const serialStatus = document.getElementById("serialStatus");
+
+  const CODE_FOR_NUM = {};
+  const CODE_FOR_CMD = {};
+  Object.keys(REMOTE_CODES).forEach(hex=>{
+    const code = parseInt(hex, 10);
+    const a = REMOTE_CODES[code];
+    if(a.k === "num") CODE_FOR_NUM[a.v] = code;
+    else CODE_FOR_CMD[a.v] = code;
+  });
+
+  async function sendToArduino(code){
+    if(!serialPort || !serialPort.writable) return;
+    try{
+      if(!serialWriter) serialWriter = serialPort.writable.getWriter();
+      await serialWriter.write(new Uint8Array([code]));
+    } catch(err){
+      setSerialStatus("write error: " + (err && err.message ? err.message : err), "err");
+    }
+  }
+
+  function setSerialStatus(text, cls){
+    serialStatus.textContent = text;
+    serialStatus.className = "serial-status" + (cls ? " " + cls : "");
+  }
+
+  if(!("serial" in navigator)){
+    serialBtn.classList.add("unsupported");
+    serialBtn.title = "Web Serial requires Chrome/Edge";
+    setSerialStatus("Web Serial unsupported in this browser", "err");
+  }
+
+  serialBtn.addEventListener("click", async ()=>{
+    if(!("serial" in navigator)){
+      setSerialStatus("use Chrome or Edge on desktop", "err");
+      return;
+    }
+    if(serialPort){
+      await disconnectSerial();
+      return;
+    }
+    try{
+      serialPort = await navigator.serial.requestPort();
+      await serialPort.open({ baudRate: 9600 });
+      serialBtn.textContent = "🔌 Disconnect";
+      serialBtn.classList.add("connected");
+      setSerialStatus("connected · 9600 baud", "ok");
+      readSerialLoop();
+    } catch(err){
+      serialPort = null;
+      setSerialStatus("connection failed", "err");
+    }
+  });
+
+  function resetSerialUI(){
+    serialBtn.textContent = "🔌 Connect Arduino";
+    serialBtn.classList.remove("connected");
+    serialPort = null;
+  }
+
+  async function disconnectSerial(){
+    serialKeepReading = false;
+    try{ if(serialWriter){ serialWriter.releaseLock(); serialWriter = null; } } catch(e){}
+    try{ if(serialReader) await serialReader.cancel(); } catch(e){}
+    try{ if(serialPort) await serialPort.close(); } catch(e){}
+    resetSerialUI();
+    setSerialStatus("not connected · 9600 baud", "");
+  }
+
+  async function readSerialLoop(){
+    serialKeepReading = true;
+    let lineBuf = "";
+    while(serialPort && serialPort.readable && serialKeepReading){
+      const textDecoder = new TextDecoderStream();
+      const readableClosed = serialPort.readable.pipeTo(textDecoder.writable);
+      serialReader = textDecoder.readable.getReader();
+      try{
+        while(true){
+          const { value, done } = await serialReader.read();
+          if(done) break;
+          if(value){
+            lineBuf += value;
+            let idx;
+            while((idx = lineBuf.indexOf("\n")) >= 0){
+              const line = lineBuf.slice(0, idx).trim();
+              lineBuf = lineBuf.slice(idx+1);
+              handleSerialLine(line);
+            }
+          }
+        }
+      } catch(err){
+        setSerialStatus("read error", "err");
+      } finally {
+        serialReader.releaseLock();
+      }
+      try{ await readableClosed; } catch(e){}
+      if(!serialKeepReading) break;
+    }
+  }
+
+  function handleSerialLine(line){
+    const m = /Button:\s*0x([0-9A-Fa-f]+)/.exec(line);
+    if(!m) return;
+    const code = parseInt(m[1], 16);
+    const action = REMOTE_CODES[code];
+    if(!action) return;
+
+    let sel = null;
+    if(action.k === "num"){
+      sel = document.querySelector('button.key[data-cmd="'+action.v+'"]');
+      pressNumber(action.v);
+    } else {
+      sel = document.querySelector('button.key[data-cmd="'+action.v+'"]');
+      pressCmd(action.v);
+    }
+    if(sel) flash(sel);
+    render();
+  }
+
+  // Initial Splash Screen Overlay
+  modeOverlay = { l1:" IR TEXTING", l2:"   ABC MODE", until: Date.now()+1200 };
+  busy = true;
+  setTimeout(()=>{ modeOverlay = null; busy = false; render(); }, 1200);
+  render();
+})();
+</script>
+</body>
+</html>
